@@ -1,0 +1,18 @@
+{
+  "deepseek_api_key": {
+    "description": "DeepSeek API Key",
+    "type": "string",
+    "default": "",
+    "secret": true
+  },
+  "deepseek_base_url": {
+    "description": "DeepSeek API 地址",
+    "type": "string",
+    "default": "https://api.deepseek.com"
+  },
+  "deepseek_model": {
+    "description": "DeepSeek 模型名称",
+    "type": "string",
+    "default": "deepseek-flash"
+  }
+}
