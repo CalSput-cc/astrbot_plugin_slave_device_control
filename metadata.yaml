@@ -1,10 +1,12 @@
 name: astrbot_plugin_slave_device_control
-display_name: 核桃派外设控制
-short_desc: 通过 QQ 消息远程控制核桃派 GPIO 外设
+display_name: 开发板外设控制
+logo: logo.png 
+short_desc: 通过 QQ 消息远程控制开发板（以核桃派2B为例）
 desc: |
-  一个基于 AstrBot 的外设控制插件，用于通过 QQ 消息远程控制核桃派（WalnutPi 2B）的 GPIO 外设，如电机、LED 等。
-  本项目为学习性质的开源项目，仅作内部测试使用。
-version: 1.0.0
+  一个基于 AstrBot 的外设控制插件，用于通过 QQ 消息远程控制开发板（这里以核桃派2B为例），并对外设、GPIO（这里以串口通信为例）进行操作。
+  本项目为学习性质的开源项目，主要用于学习 AstrBot 插件开发与嵌入式 GPIO 控制的结合。
+  该插件对于不同的开发板环境并不具有普适性（这里以核桃派为例），部分GPIO操作可能由于引脚编号不同、设备节点不同、代码使用的库不同等原因而失效，如有在其他设备移植需求请自行查找并映射设备节点，修改相应库和代码。
+version: 1.2.0
 author: CalSput
 repo: https://github.com/CalSput-cc/astrbot_plugin_slave_device_control
 astrbot_version: ">=4.16,<5"

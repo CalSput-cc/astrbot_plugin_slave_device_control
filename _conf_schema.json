@@ -14,5 +14,10 @@
     "description": "DeepSeek 模型名称",
     "type": "string",
     "default": "deepseek-flash"
+  },
+  "serial_port":{
+    "description": "串口设备节点",
+    "type": "string",
+    "default": ""
   }
 }
