@@ -1,0 +1,25 @@
+# Keil MDK 编译产物
+MDK-ARM/Objects/
+MDK-ARM/Listings/
+MDK-ARM/DebugConfig/
+MDK-ARM/RTE/
+MDK-ARM/*.bak
+MDK-ARM/*.scvd
+MDK-ARM/*.uvguix.*
+
+# 通用编译产物
+*.o
+*.d
+*.elf
+*.hex
+*.bin
+*.map
+*.axf
+*.lst
+*.crf
+*.dep
+*.htm
+*.lnp
+*.plg
+*.iex
+*.sct
