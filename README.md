@@ -59,6 +59,7 @@ services:
 | `往左看看` | 云台转向左侧并拍照返回 |
 
 ## 演示
+<img width="1112" height="310" alt="QQ20261007-141231-HD" src="https://github.com/user-attachments/assets/22494253-8f1e-4737-bc10-60b35c4c07d2" />
 
 
 
