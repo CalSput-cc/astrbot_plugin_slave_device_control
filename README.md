@@ -27,6 +27,9 @@
 - 单片机（如stm32）作为下位机
 - 如有需求可增加其他模块
 
+## 接线示意图
+<img width="2428" height="1042" alt="云台接线示意图_简化" src="https://github.com/user-attachments/assets/311ead30-299c-4b07-976d-da3823ac1b86" />
+
 # 环境需求
 - AstrBot 部署在 Docker 容器中
 - 容器需映射 GPIO 设备节点
