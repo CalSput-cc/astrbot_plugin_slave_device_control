@@ -10,12 +10,13 @@ import re
 import random
 import cv2
 import time
+import base64
 
 
 @register("astrbot_plugin_slave_device_control",
           "404NotFound",
           "docker容器开发板控制插件",
-          "1.2.0")
+          "1.3.0")
 
 class MyPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
@@ -24,29 +25,48 @@ class MyPlugin(Star):
         logger.info("测试插件已初始化")
         
         self.serial_port = ""
+        self.serial_baudrate = 0
         self.ser = None
             
         #AI客户端
+            #deepseek
         self.deepseek_client = None
-        self.deepseek_model = "deepseek-flash"
+        self.deepseek_model = ""
+        
+            #minimax
+        self.minimax_client = None
+        self.minimax_model = ""
 
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。
-           创建deepseek客户端"""
+           创建AI客户端"""
         config = self.config or {}
-        api_key = config.get("deepseek_api_key","")
-        base_url = config.get("deepseek_base_url","")
+        
+        #deepseek
+        ds_api_key = config.get("deepseek_api_key","")
+        ds_base_url = config.get("deepseek_base_url","")
         self.deepseek_model = config.get("deepseek_model","")
-        if api_key:
-            self.deepseek_client = OpenAI(api_key = api_key, base_url = base_url)
+        if ds_api_key:
+            self.deepseek_client = OpenAI(api_key = ds_api_key, base_url = ds_base_url)
             logger.info(f"deepseek客户端初始化完成，模型为{self.deepseek_model}")
         else:
-            logger.warning("未配置deepseek API key, 请配置后重载插件")
-            
+            logger.error("未配置deepseek API key, 请配置后重载插件")
+        
+        #minimax初始化
+        mx_api_key = config.get("minimax_api_key","")
+        mx_base_url = config.get("minimax_base_url","")
+        self.minimax_model = config.get("minimax_model","")
+        if mx_api_key:
+            self.minimax_client = OpenAI(api_key = mx_api_key, base_url = mx_base_url)
+            logger.info(f"minimax客户端初始化完成，模型为{self.minimax_model}")
+        else:
+            logger.error("未配置minimax API key, 请配置后重载插件")
+        
+        #串口初始化    
         self.serial_port = config.get("serial_port","")
-        #串口初始化
+        self.serial_baudrate = int(config.get("serial_baudrate",""))
         try:
-            self.ser = serial.Serial(self.serial_port, 115200, timeout=1)
+            self.ser = serial.Serial(self.serial_port, self.serial_baudrate, timeout=1)
             logger.info(f"串口 {self.serial_port} 打开成功")
         except Exception as e:
             logger.info(f"串口打开失败 {e}")
@@ -68,7 +88,7 @@ class MyPlugin(Star):
     async def test(self, event: AstrMessageEvent):
         """收到 /测试 时会回复"""
         logger.info(f"已收到来自{event.get_sender_name()}的测试消息，这里是外设控制测试插件。")
-        yield event.plain_result("插件加载成功，可以正常响应!")
+        yield event.plain_result("外设插件加载成功，可以正常响应!")
     
     @filter.command("串口发送")
     async def gpiocontrol(self, event:AstrMessageEvent, message: str):
@@ -125,17 +145,23 @@ class MyPlugin(Star):
             logger.error(f"拍照异常: {e}")
             yield event.plain_result(f"拍照失败: {e}")
             
-    #简单的 “何意味” 识别并回复
+    #简单的 “何意味” 及内卷关键词识别并回复
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def hyw_on_all_message(self, event:AstrMessageEvent):
-        """监听所有消息，获取关键词何意味 """
+        """监听所有消息，获取关键词何意味和内卷"""
         user_name = event.get_sender_name()
         message_str = event.message_str
-        key_words = ["何意味", "hyw", "何以为", "和一位"]
-        if any(kw in message_str for kw in key_words):
+        key_words_1 = ["何意味", "hyw", "何以为", "和一位"]
+        key_words_2 = ["不要卷","卷死","卷麻"]
+        if any(kw in message_str for kw in key_words_1):
             logger.info(f"识别到{user_name}发来的 “hyw” ")
             yield event.plain_result(random.choice(["何意味", "hyw"]))
-        
+        if "卷" in message_str:
+            if any(kw in message_str for kw in key_words_2):
+                logger.info(f"识别到{user_name}发来的内卷消息")
+                yield event.plain_result(random.choice(["卷","卷麻了","不要卷了","卷死了"]))
+            else:
+                yield event.plain_result("卷")  
             
     #自然语言控制舵机：上位机（运行astrbot，读取用户命令，deepseek（目前仅支持ds）解析出控制参数并通过串口发送 ——> 下位机接收参数并控制）
     @filter.event_message_type(filter.EventMessageType.ALL)     #监听所有消息
@@ -279,9 +305,13 @@ class MyPlugin(Star):
         if not message_str or message_str.startswith("/"):
             return
         
-        fliter_flag = ["看","摄像头","云台"]
-        if any(kw in message_str for kw in fliter_flag):
-            logger.info(f"识别到 {user_name} 发来的云台控制关键词：{message_str}，将执行AI分析")
+        filter_flag_1 = ["向","往","朝","云台","摄像头"]
+        fliter_flag_2 = ["看","摄像头","云台"]
+        if any(kw1 in message_str for kw1 in filter_flag_1): 
+            if any(kw2 in message_str for kw2 in fliter_flag_2):
+                logger.info(f"识别到 {user_name} 发来的云台控制关键词：{message_str}，将执行AI分析")
+            else:
+                return
         else:
             return
         
@@ -312,9 +342,18 @@ class MyPlugin(Star):
             else:
                 yield event.plain_result("拍摄失败~(#_#))")
                 return
+            
+            if angle[3]:
+                image_data = await self.minimax_image(photo_path)
+                if image_data:
+                    logger.info(f"收到来自minimax的回复：{image_data}")
+                    yield event.plain_result(image_data)
+                else:
+                    yield event.plain_result("图片识别失败~(#_#)")
+                            
         else:
             yield event.plain_result("未收到拍摄指令~")
-            return   
+            return
         
     async def ai_analyse(self, user_input: str):
         if self.deepseek_client is None:
@@ -328,7 +367,7 @@ class MyPlugin(Star):
         
         方向初始化：
         1.一号舵机90°为正前方，0°和180°以你的视角并根据逆时针转向分别为右侧和左侧。
-        2.二号舵机90°为正前方，0°和180°以你的视角并根据逆时针转向分别为上侧和下侧。
+        2.二号舵机90°为正前方，0°和180°以你的视角并根据逆时针转向分别为下侧和上侧。(0-50°为死区，千万不能输出这个范围内的角度，不然摄像头会撞到)
                 
         你的任务：
         1. 判断用户输入是否是控制该摄像头-云台系统的命令。
@@ -336,23 +375,27 @@ class MyPlugin(Star):
         3. 如果不是舵机控制命令，返回 {"is_gimbal": false}。
         4. 请注意：用户也可能一段闲聊后跟随控制云台的命令，注意识别！
         5. 请注意：用户大概率不会描述准确的角度，请注意识别“稍微”、“偏”、“稍稍”、“一点”、“大幅”等程度副词。
+        6. 请注意：是否需要识别图片内容也需要你来解析用户发来的指令.
                 
         只返回一个 JSON，不要包含任何其他文字。
                 
         格式：
-        {"is_gimbal": true, "angle_1": <角度整数>, "angle_2": <角度整数>, "camera": <true 或 false (这里返回的是布尔值！！！代码将直接使用你输出的内容！！！)>}
+        {"is_gimbal": true, "angle_1": <角度整数>, "angle_2": <角度整数>, "camera": <true 或 false (这里返回的是布尔值！！！代码将直接使用你输出的内容！！！)>, "recognize": <true 或 false (这里返回的是布尔值！！！代码将直接使用你输出的内容！！！)>}
         或
         {"is_gimbal": false}
                 
         示例：
-        - "转到左边看看" -> {"is_gimbal": true, "angle_1": 180, "angle_2": 90, "camera": true}
-        - "转到右下侧看看" -> {"is_gimbal": true, "angle_1": 0, "angle_2": 135, "camera": true}
-        - "云台转到偏左侧并斜向上打开摄像头" -> {"is_gimbal": true, "angle_1": 135, "angle_2": 45, "camera": true}
+        - "转到左边看看" -> {"is_gimbal": true, "angle_1": 180, "angle_2": 90, "camera": true, "recognize": false}
+        - "转到左边看看有什么东西" -> {"is_gimbal": true, "angle_1": 180, "angle_2": 90, "camera": true, "recognize": true}
+        - "转到右下侧看看" -> {"is_gimbal": true, "angle_1": 0, "angle_2": 45, "camera": true, "recognize": false}
+        - "转到右下侧看看,并说出你看到的内容" -> {"is_gimbal": true, "angle_1": 0, "angle_2": 45, "camera": true, "recognize": true}
+        - "云台转到偏左侧并斜向上打开摄像头" -> {"is_gimbal": true, "angle_1": 135, "angle_2": 135, "camera": true, "recognize": false}
+        - "云台转到偏左侧并斜向上打开摄像头并识别图片内容" -> {"is_gimbal": true, "angle_1": 135, "angle_2": 135, "camera": true, "recognize": true}
         - "今天天气怎么样" -> {"is_gimbal": false}
         - "打开灯" -> {"is_gimbal": false}
         - "这个世界没救了" -> {"is_gimbal": false}
-        - "体测不及格导致我没有保研评优资格，哭了，这个世界赶紧毁灭吧。你再睁眼看看这个世界吧" -> {"is_gimbal": true, "angle_1": 90, "angle_2": 90, "camera": true}
-        - "云台先往左转，先不要打开摄像头" -> {"is_gimbal": true, "angle_1": 180, "angle_2": 90, "camera": false}
+        - "体测不及格导致我没有保研评优资格，哭了，这个世界赶紧毁灭吧。你再睁眼看看这个世界吧" -> {"is_gimbal": true, "angle_1": 90, "angle_2": 90, "camera": true, "recognize": true}
+        - "云台先往左转，先不要打开摄像头" -> {"is_gimbal": true, "angle_1": 180, "angle_2": 90, "camera": false, "recognize": false}
         """
         try:
             ai_response = self.deepseek_client.chat.completions.create(
@@ -386,7 +429,8 @@ class MyPlugin(Star):
                     logger.warning("解析角度超出范围")
                     return -2
             camera = bool(result.get("camera", False))
-            return [angle[0], angle[1], camera]
+            recognize = bool(result.get("recognize", False))
+            return [angle[0], angle[1], camera, recognize]
         
         #懒得写正则了，一般ai解析没有啥问题
         
@@ -443,7 +487,59 @@ class MyPlugin(Star):
             
         except Exception as e:
             logger.error(f"拍照异常: {e}")
-            return False, None       
+            return False, None
+        
+    async def minimax_image(self, image_path: str):
+        if self.minimax_client is None:
+            return
+        
+        system_prompt = "你是一个图片识别器，请详细描述这张图片的内容，包括主体、场景、颜色和任何可见的文字，最终输出一段话。"
+        
+        try:
+            #图片转url
+            with open(image_path, "rb") as p:
+                image_data = p.read()
+            b64 = base64.b64encode(image_data).decode("utf-8")
+            if "." in image_path:
+                ext = image_path.rsplit(".", 1)[-1].lower()
+            else:
+                ext = "jpg"
+            if ext in ["png","jpg","jpeg","gif","webp"]: 
+                mime = f"image/{ext}"
+            else:
+                mime = "image/jpg"
+            image_url = f"data:{mime};base64,{b64}"
+            
+            response = self.minimax_client.chat.completions.create(
+                model=self.minimax_model,
+                reasoning_effort="max",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": system_prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": image_url,
+                                    "detail": "default",
+                                },
+                            }
+                        ],
+                    }
+                ],
+            )
+            
+            content = response.choices[0].message.content
+            if content.strip():
+                return content.strip()
+            
+            logger.warning("图片识别返回内容为空")
+            return None
+                
+        except Exception as e:
+            logger.error(f"图片识别失败：{e}")
+            return None      
                
     async def terminate(self):
         """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""

@@ -15,9 +15,30 @@
     "type": "string",
     "default": "deepseek-flash"
   },
+  "minimax_api_key":{
+    "description": "MiniMax API Key",
+    "type": "string",
+    "default": "",
+    "secret": true
+  },
+  "minimax_base_url":{
+    "description": "MiniMax API 地址",
+    "type": "string",
+    "default": "https://api.minimax.cn/v1"
+  },
+  "minimax_model":{
+    "description": "MiniMax 模型名称",
+    "type": "string",
+    "default": "MiniMax-M3"
+  },
   "serial_port":{
     "description": "串口设备节点",
     "type": "string",
     "default": ""
+  },
+  "serial_baudrate":{
+    "description": "串口波特率",
+    "type": "int",
+    "default": "115200"
   }
 }
